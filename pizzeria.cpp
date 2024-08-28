@@ -58,7 +58,7 @@ int verifica_ingredientes(pizza pizza) {
 
 void prepara_pizza(pizza pizza) {
     for (int i = 0; i < 3; i++)
-        ingredientes[i] -= pizza[i];
+        *ingredientes[i] -= pizza[i];
 }
 
 
@@ -133,6 +133,7 @@ void * cliente(void* pi) {
     }
     pthread_mutex_unlock(&mutex_valores);
     pthread_exit(0);
+    return NULL;
 }
 
 
