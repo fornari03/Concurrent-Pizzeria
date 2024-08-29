@@ -41,7 +41,10 @@ queue<pedido> fila_pedidos;
 queue<pedido> pedidos_prontos;
 
 // STATUS CLIENTES
-array<bool, quant_clientes> status_clientes;
+// 0: cliente não fez o pedido ainda
+// 1: cliente vai receber a pizza
+// -1: cliente não vai receber a pizza
+array<int, quant_clientes> status_clientes;
 
 
 pizza escolhe_pizza() {
@@ -148,9 +151,14 @@ void * cliente(void* pi) {
             }
             pthread_cond_broadcast(&cozinheiro_cond);
 
-            while (status_clientes[*(int *)(pi)]) {
+            while (status_clientes[*(int *)(pi)] == 1) {
                 pthread_cond_wait(&cliente_cond, &mutex_valores);
             }   
+            if (status_clientes[*(int *)(pi)] == -1) {
+                printf("Cliente %d: nunca mais peço nessa pizzaria!!", *(int *)(pi));
+                break;
+            }
+            else 
             printf("Cliente %d: recebi minha pizza de sabor %s!! \n", *(int *)(pi), get_sabor_pizza(pizza).c_str());
         pthread_mutex_unlock(&mutex_valores);
     }
@@ -180,16 +188,16 @@ void * cozinheiro(void* pi) {
                 pthread_mutex_lock(&mutex_valores);
                     pedidos_prontos.push(pedido);
                     pthread_cond_broadcast(&entregador_cond);
-                pthread_mutex_unlock(&mutex_valores);
             }
             else {
-                pthread_mutex_unlock(&mutex_valores);
                 printf("Cozinheiro %d: não temos ingredientes para o sabor %s \n", *(int *)(pi), get_sabor_pizza(pedido.second).c_str());
-                printf("Cliente %d: nunca mais peço nessa pizzaria!!", pedido.first);
+                status_clientes[pedido.first] = -1;
+                pthread_cond_broadcast(&cliente_cond);
                 // if (status == -1) {
                 //     printf("Gerente: ACABOU O QUEIJO... NÃO ATENDEMOS MAIS PEDIDOS \n");
                 // }
             }
+            pthread_mutex_unlock(&mutex_valores);
     }
     pthread_exit(0);
 
@@ -203,7 +211,7 @@ void * entregador(void* pi) {
             pedido pedido = pedidos_prontos.front();
             pedidos_prontos.pop();
         pthread_mutex_unlock(&mutex_valores);
-        printf("Entregador %d: vou entregar a pizza do cliente %d \n", *(int *)(pi), pedido.first);
+        printf("Entregador %d: vou entregar a pizza do Cliente %d \n", *(int *)(pi), pedido.first);
         srand(time(0));
         int tempo = 5 + rand()%6;
         sleep(tempo);
