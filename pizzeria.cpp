@@ -42,7 +42,7 @@ queue<pedido> pedidos_prontos;
 
 // STATUS CLIENTES
 // 0: cliente não fez o pedido ainda
-// 1: cliente vai receber a pizza
+// 1: cliente fez o pedido e está esperando a pizza
 // -1: cliente não vai receber a pizza
 array<int, quant_clientes> status_clientes;
 
@@ -141,14 +141,9 @@ void * cliente(void* pi) {
             pizza pizza = escolhe_pizza();
             printf("Cliente: %d: quero uma pizza sabor %s\n", *(int *)(pi), get_sabor_pizza(pizza).c_str());
         
-            if (quant_queijo) {
-                fila_pedidos.push({*(int *)(pi), pizza});
-                status_clientes[*(int *)(pi)] = true;
-            }
-            else {
-                printf("Gerente: desculpe, não aceitamos mais pedidos pois acabou o queijo \n");
-                break;
-            }
+            fila_pedidos.push({*(int *)(pi), pizza});
+            status_clientes[*(int *)(pi)] = 1;
+
             pthread_cond_broadcast(&cozinheiro_cond);
 
             while (status_clientes[*(int *)(pi)] == 1) {
@@ -176,13 +171,15 @@ void * cozinheiro(void* pi) {
         
             pedido pedido = fila_pedidos.front();
             fila_pedidos.pop();
-        printf("Cozinheiro %d: vou fazer uma pizza de sabor %s para o Cliente %d \n", *(int *)(pi), get_sabor_pizza(pedido.second).c_str(), pedido.first);
         
             int status = verifica_ingredientes(pedido.second);
             if (status == 1) {
+                printf("Cozinheiro %d: vou fazer uma pizza de sabor %s para o Cliente %d \n", *(int *)(pi), get_sabor_pizza(pedido.second).c_str(), pedido.first);
                 prepara_pizza(pedido.second);
                 pthread_mutex_unlock(&mutex_valores);
+
                 sleep(10);
+
                 printf("Cozinheiro %d: terminei de fazer a pizza de %s para o Cliente %d \n", *(int *)(pi), get_sabor_pizza(pedido.second).c_str(), pedido.first);
 
                 pthread_mutex_lock(&mutex_valores);
@@ -190,12 +187,14 @@ void * cozinheiro(void* pi) {
                     pthread_cond_broadcast(&entregador_cond);
             }
             else {
-                printf("Cozinheiro %d: não temos ingredientes para o sabor %s \n", *(int *)(pi), get_sabor_pizza(pedido.second).c_str());
+                if (status == -1) {
+                    printf("Cozinheiro %d: desculpe, não aceitamos mais pedidos pois acabou o queijo \n", *(int *)(pi));
+                }
+                else {
+                    printf("Cozinheiro %d: não temos ingredientes para o sabor %s \n", *(int *)(pi), get_sabor_pizza(pedido.second).c_str());
+                }
                 status_clientes[pedido.first] = -1;
                 pthread_cond_broadcast(&cliente_cond);
-                // if (status == -1) {
-                //     printf("Gerente: ACABOU O QUEIJO... NÃO ATENDEMOS MAIS PEDIDOS \n");
-                // }
             }
             pthread_mutex_unlock(&mutex_valores);
     }
@@ -206,18 +205,20 @@ void * cozinheiro(void* pi) {
 void * entregador(void* pi) {
     while(1)  {
         pthread_mutex_lock(&mutex_valores);
-        while (pedidos_prontos.empty())
-            pthread_cond_wait(&entregador_cond, &mutex_valores);
+            while (pedidos_prontos.empty())
+                pthread_cond_wait(&entregador_cond, &mutex_valores);
             pedido pedido = pedidos_prontos.front();
             pedidos_prontos.pop();
         pthread_mutex_unlock(&mutex_valores);
         printf("Entregador %d: vou entregar a pizza do Cliente %d \n", *(int *)(pi), pedido.first);
         srand(time(0));
         int tempo = 5 + rand()%6;
+
         sleep(tempo);
-        status_clientes[pedido.first] = false;
+        status_clientes[pedido.first] = 0;
         pthread_cond_broadcast(&cliente_cond);
         sleep(tempo);
+        
         printf("Entregador %d: voltei para a pizzaria \n", *(int *)(pi));
     }
     pthread_exit(0);
