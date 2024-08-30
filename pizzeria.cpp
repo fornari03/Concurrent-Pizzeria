@@ -155,7 +155,7 @@ void * cliente(void* pi) {
                 pthread_cond_wait(&cliente_cond, &mutex_valores);
             }   
             if (status_clientes[*(int *)(pi)] == -1) {
-                printf("Cliente %d: nunca mais peço nessa pizzaria!!", *(int *)(pi));
+                printf("Cliente %d: nunca mais peço nessa pizzaria!! \n", *(int *)(pi));
                 break;
             }
             else 
