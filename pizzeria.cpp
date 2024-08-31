@@ -20,8 +20,8 @@ void * cozinheiro(void * meuid);
 void * entregador(void * meuid);
 void * cliente(void * meuid);
 
+// mutex para garantir a exclusão mútua
 pthread_mutex_t mutex_valores = PTHREAD_MUTEX_INITIALIZER;
-// FAZER UM MUTEX_valores SÓ PARA OS PEDIDOS????
 
 // conds para as respectivas threads
 pthread_cond_t cliente_cond = PTHREAD_COND_INITIALIZER;
@@ -167,7 +167,7 @@ int main(void) {
 */
 void * cliente(void* pi) {
     while(1) {
-        sleep(rand() % 30);
+        sleep(rand() % 30);                 // cliente liga em um intervalo de tempo aleatório
 
         pthread_mutex_lock(&mutex_valores);     // adquire o lock do mutex
             srand(time(0));
@@ -182,7 +182,7 @@ void * cliente(void* pi) {
             // acorda o cozinheiro
             pthread_cond_broadcast(&cozinheiro_cond);
 
-            // espera a pizza ficar pronta ou receber um aviso de que não vai receber
+            // espera a pizza ficar pronta ou receber um aviso de que não vai recebê-la
             while (status_clientes[*(int *)(pi)] == 1) {
                 pthread_cond_wait(&cliente_cond, &mutex_valores);
             }   
